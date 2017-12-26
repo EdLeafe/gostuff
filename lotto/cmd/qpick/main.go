@@ -2,21 +2,16 @@ package main
 
 import (
 	"fmt"
-    "github.com/EdLeafe/numbers"
+	"github.com/EdLeafe/lotto/lib/mega"
 )
 
 func main() {
-    numbers.SeedRandom()
-    // Pick 5 numbers from 1 to 75
-    picks := numbers.RandSet(1, 75, 5)
-
-    // Add the mega ball
-    mega := numbers.RandRange(1, 25)
-
-    fmt.Printf("Your numbers are: ")
-    for _, num := range picks {
-        fmt.Printf("%d ", num)
-    }
-    fmt.Printf("\n")
-    fmt.Printf("            Mega: %d\n", mega)
+	res := mega.QuickPick()
+	picks := []int{res.P0, res.P1, res.P2, res.P3, res.P4}
+	fmt.Printf("Your numbers are: ")
+	for _, num := range picks {
+		fmt.Printf("%d ", num)
+	}
+	fmt.Printf("\n")
+	fmt.Printf("            Mega: %d\n", res.Mega)
 }

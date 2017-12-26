@@ -4,6 +4,7 @@ import (
 	"fmt"
     "github.com/EdLeafe/numbers"
     "github.com/EdLeafe/arrayFunc"
+    "github.com/EdLeafe/lotto/lib/mega"
 	"os"
 	"strconv"
     "text/tabwriter"
@@ -25,38 +26,16 @@ type matchResult struct {
     match5M int
 }
 
-type megaResult struct {
-    one int
-    two int
-    three int
-    four int
-    five int
-    mega int
-}
-
 type matchCompare struct {
     number int
     mega bool
 }
 
-func MegaMillionsPick() (megaResult) {
-        res := megaResult{}
-		picks := numbers.RandSet(1, 70, 5)
-		res.one = picks[0]
-        res.two = picks[1]
-        res.three = picks[2]
-        res.four = picks[3]
-        res.five = picks[4]
-		res.mega = numbers.RandRange(1, 25)
-        return res
-}
-
-func matchDrawing(ticket megaResult, drawing megaResult) matchCompare {
-    megaMatch := ticket.mega == drawing.mega
-    ticketArray := []int{ticket.one, ticket.two, ticket.three, ticket.four,
-            ticket.five}
-    drawingArray := []int{drawing.one, drawing.two, drawing.three, drawing.four,
-            drawing.five}
+func matchDrawing(ticket mega.MegaResult, drawing mega.MegaResult) matchCompare {
+    megaMatch := ticket.Mega == drawing.Mega
+    ticketArray := []int{ticket.P0, ticket.P1, ticket.P2, ticket.P3, ticket.P4}
+    drawingArray := []int{drawing.P0, drawing.P1, drawing.P2, drawing.P3,
+        drawing.P4}
     matches := 0
     for val, _ := range ticketArray {
         if arrayFunc.IntIn(val, drawingArray) {
@@ -95,10 +74,10 @@ func addToResults(meta matchCompare, results *matchResult) {
     }
 }
 
-func runDrawings(count int, ticket megaResult, c chan matchCompare) {
-    draw := megaResult{}
+func runDrawings(count int, ticket mega.MegaResult, c chan matchCompare) {
+    draw := mega.MegaResult{}
     for i:=0; i<count; i++ {
-        draw = MegaMillionsPick()
+        draw = mega.QuickPick()
         c <- matchDrawing(ticket, draw)
     }
     close(c)
@@ -183,7 +162,7 @@ func main() {
     // OK, let's go!
     start := time.Now()
 
-    myTicket := MegaMillionsPick()
+    myTicket := mega.QuickPick()
     go runDrawings(drawings, myTicket, c)
 
     for res := range c {
