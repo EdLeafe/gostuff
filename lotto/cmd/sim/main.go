@@ -165,14 +165,14 @@ func output(total int, results matchResult, elapsed time.Duration) {
 }
 
 func main() {
-	// Set the default
+    // Set the default
     drawings := 1000
-	// Check for command-line override
-	args := os.Args[1:]
-	if len(args) > 0 {
-		sdrawings := args[0]
-		drawings, _ = strconv.Atoi(sdrawings)
-	}
+    // Check for command-line override
+    args := os.Args[1:]
+    if len(args) > 0 {
+        sdrawings := args[0]
+        drawings, _ = strconv.Atoi(sdrawings)
+    }
     // Create the struct for the results
     myResults := matchResult{}
     c := make(chan matchCompare, 10)
