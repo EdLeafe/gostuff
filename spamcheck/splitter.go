@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/mail"
-	//	"net/smtp"
 	"os"
 	"regexp"
 	"sort"
@@ -13,7 +12,6 @@ import (
 	"sync"
 )
 
-const FNAME = "spammail"
 const MSGSPLIT = "\\n\\nFrom "
 const EDPAT = "\\bED\\b"
 const SENDPAT = "([^<]+)<\\S+>"
@@ -70,24 +68,17 @@ func updateFrom(h mail.Header) string {
 	return ""
 }
 
-func updateRecip(h mail.Header) []string {
+func updateRecip(h mail.Header) string {
 	orig := h.Get("X-Original-To")
-	ret := []string{"", ""}
+    ret := ""
 	if len(orig) > 0 {
 		//rmap[orig] += 1
-		ret[0] = orig
-	}
-	toAddr := h.Get("To")
-	if len(toAddr) > 0 {
-		//	rmap[toAddr] += 1
-		ret[1] = toAddr
+		ret = orig
 	}
 	return ret
 }
 
-func processMsg(wg *sync.WaitGroup, txt string, chSubj chan string,
-	chEds chan string, chSend chan string, chRecp chan string) {
-
+func processMsg(wg *sync.WaitGroup, txt string, chans ParseChannels) {
 	defer wg.Done()
 	stxt := strings.TrimSpace(txt)
 	r := strings.NewReader(stxt)
@@ -96,27 +87,28 @@ func processMsg(wg *sync.WaitGroup, txt string, chSubj chan string,
 	h := msg.Header
 
 	ss := updateSubject(h)
-	chSubj <- ss[0]
-	chEds <- ss[1]
+	chans.Subjs <- ss[0]
+    if ss[1] != "" {
+        chans.Eds <- ss[1]
+    }
 	f := updateFrom(h)
-	chSend <- f
+	chans.Senders <- f
 	rr := updateRecip(h)
-	chSend <- rr[0]
-	chRecp <- rr[1]
+    chans.Recips <- rr
 }
 
 func sortStringCount(txts map[string]int, ones bool) []string {
-	bsc := byStringCount{}
-	for k, v := range txts {
-		sc := StringCount{k, v}
-		bsc = append(bsc, sc)
-	}
-	sort.Sort(bsc)
+bsc := byStringCount{}
+for k, v := range txts {
+    sc := StringCount{k, v}
+    bsc = append(bsc, sc)
+}
+sort.Sort(bsc)
 
-	numtxt := []string{}
-	for _, scOrd := range bsc {
-		txt := scOrd.Text
-		if ones || scOrd.Count > 1 {
+numtxt := []string{}
+for _, scOrd := range bsc {
+    txt := scOrd.Text
+    if ones || scOrd.Count > 1 {
 			txt = fmt.Sprintf("[%d] %s", scOrd.Count, scOrd.Text)
 		}
 		numtxt = append(numtxt, txt)
@@ -124,24 +116,42 @@ func sortStringCount(txts map[string]int, ones bool) []string {
 	return numtxt
 }
 
-func main() {
-	// Create the maps for the various reports
-	subjs := map[string]int{}
-	eds := map[string]int{}
-	senders := map[string]int{}
-	recips := map[string]int{}
+type ParseChannels struct {
+    Subjs chan string
+    Eds chan string
+    Senders chan string
+    Recips chan string
+}
 
+func (ch ParseChannels) Close() {
+    close(ch.Subjs)
+    close(ch.Eds)
+    close(ch.Senders)
+    close(ch.Recips)
+}
+
+type SpamResults struct {
+	SortedSubjects []string
+	SortedEds []string
+	SortedSenders []string
+	SortedRecips []string
+    Count int
+}
+
+func Analyze(pth string) SpamResults {
+    chans := ParseChannels{}
 	var wg sync.WaitGroup
 	var buf bytes.Buffer
-	chSubj := make(chan string, 10000)
-	chEds := make(chan string, 10000)
-	chSend := make(chan string, 10000)
-	chRecp := make(chan string, 10000)
+	chans.Subjs = make(chan string, 10000)
+	chans.Eds = make(chan string, 10000)
+	chans.Senders = make(chan string, 10000)
+	chans.Recips = make(chan string, 10000)
 	splitter := regexp.MustCompile(MSGSPLIT)
-	f, err := os.Open(FNAME)
+	f, err := os.Open(pth)
 	check(err)
 	defer f.Close()
 	b := make([]byte, 1024)
+    msgCount := 0
 	for {
 		// Read 1K chunk
 		if _, err = f.Read(b); err == io.EOF {
@@ -161,41 +171,41 @@ func main() {
 				txt := alltext[:pos]
 				buf.WriteString(alltext[pos:])
 				wg.Add(1)
-				go processMsg(&wg, txt, chSubj, chEds, chSend, chRecp)
+                msgCount += 1
+				go processMsg(&wg, txt, chans)
 			}
 		}
 	}
 	// We've gotten to the end, so the buffer will contain the last message.
 	// Process that one, and we're done.
 	wg.Add(1)
-	go processMsg(&wg, buf.String(), chSubj, chEds, chSend, chRecp)
+    msgCount += 1
+	go processMsg(&wg, buf.String(), chans)
 	wg.Wait()
-    close(chSubj)
-    close(chEds)
-    close(chSend)
-    close(chRecp)
-	for ss := range chSubj {
+    chans.Close()
+	// Create the maps for the various reports
+    subjs := make(map[string]int)
+    eds := make(map[string]int)
+    senders := make(map[string]int)
+    recips := make(map[string]int)
+	for ss := range chans.Subjs {
 		subjs[ss] += 1
 	}
-	for ss := range chEds {
+	for ss := range chans.Eds {
 		eds[ss] += 1
 	}
-	for ss := range chSend {
+	for ss := range chans.Senders {
 		senders[ss] += 1
 	}
-	for ss := range chRecp {
+	for ss := range chans.Recips {
 		recips[ss] += 1
 	}
 
-	sortedSubjects := sortStringCount(subjs, false)
-	sortedRecips := sortStringCount(recips, true)
+	sortedSubjs := sortStringCount(subjs, false)
 	sortedEds := sortStringCount(eds, false)
 	sortedSenders := sortStringCount(senders, false)
-
-	if sortedSubjects == nil || sortedEds == nil || sortedSenders == nil || sortedRecips == nil{
-		fmt.Println("Just to keep the compiler from complaining.")
-	}
-	for _, itm := range sortedSubjectsdasdasdas{
-		fmt.Println(itm)
-	}
+	sortedRecips := sortStringCount(recips, true)
+    result := SpamResults{sortedSubjs, sortedEds, sortedSenders, sortedRecips,
+        msgCount}
+    return result
 }

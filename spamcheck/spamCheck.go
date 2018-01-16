@@ -5,19 +5,12 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	//	"path"
 	"regexp"
 	"time"
 )
 
 // Flip this when we're ready
 const PRODUCTION = false
-
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
 
 func dummy(s string) *regexp.Regexp {
 	ret, _ := regexp.Compile(s)
@@ -83,21 +76,19 @@ func copyFileContents(src, dst string) (err error) {
 	return
 }
 
-func moveToChecked(prefix string) {
+func moveToChecked(prefix string) string {
 	dname := time.Now().Format("20060102_150405")
 	src := fmt.Sprintf("/home/ed/spam/%sspammail", prefix)
 	dst := fmt.Sprintf("/home/ed/spam/checked/%s%s", prefix, dname)
 
-	if !PRODUCTION {
-		fmt.Println("src =", src)
-		fmt.Println("dst =", dst)
-		return
-	}
 	// copy to the checked directory
 	CopyFile(src, dst)
-	// empty the source file
-	empty := []byte{}
-	ioutil.WriteFile(src, empty, 0660)
+    if PRODUCTION {
+        // empty the source file
+        empty := []byte{}
+        ioutil.WriteFile(src, empty, 0660)
+    }
+    return dst
 }
 
 func main() {
@@ -106,5 +97,7 @@ func main() {
 	if len(args) > 0 {
 		prefix = args[0]
 	}
-	moveToChecked(prefix)
+	loc := moveToChecked(prefix)
+    analyzed := Analyze(loc)
+    MailOut(analyzed, loc)
 }

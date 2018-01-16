@@ -48,3 +48,23 @@ func Distribution(low, high, total int) []int {
     }
     return count
 }
+
+func MinInt(sl []int) int {
+    m := sl[0]
+    for _, v := range sl[1:] {
+        if v < m {
+            m = v
+        }
+    }
+    return m
+}
+
+func MaxInt(sl []int) int {
+    m := sl[0]
+    for _, v := range sl[1:] {
+        if v > m {
+            m = v
+        }
+    }
+    return m
+}

@@ -1,10 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
     "github.com/EdLeafe/numbers"
     "github.com/EdLeafe/arrayFunc"
-    "github.com/EdLeafe/lotto/lib/mega"
+    "github.com/EdLeafe/lotto/lib/games"
 	"os"
 	"strconv"
     "text/tabwriter"
@@ -28,11 +29,11 @@ type matchResult struct {
 
 type matchCompare struct {
     number int
-    mega bool
+    ball bool
 }
 
-func matchDrawing(ticket mega.MegaResult, drawing mega.MegaResult) matchCompare {
-    megaMatch := ticket.Mega == drawing.Mega
+func matchDrawing(ticket games.GameResult, drawing games.GameResult) matchCompare {
+    ballMatch := ticket.Ball == drawing.Ball
     ticketArray := []int{ticket.P0, ticket.P1, ticket.P2, ticket.P3, ticket.P4}
     drawingArray := []int{drawing.P0, drawing.P1, drawing.P2, drawing.P3,
         drawing.P4}
@@ -42,7 +43,7 @@ func matchDrawing(ticket mega.MegaResult, drawing mega.MegaResult) matchCompare 
             matches += 1
         }
     }
-    return matchCompare{matches, megaMatch}
+    return matchCompare{matches, ballMatch}
 }
 
 func addToResults(meta matchCompare, results *matchResult) {
@@ -74,10 +75,11 @@ func addToResults(meta matchCompare, results *matchResult) {
     }
 }
 
-func runDrawings(count int, ticket mega.MegaResult, c chan matchCompare) {
-    draw := mega.MegaResult{}
+func runDrawings(game string, count int, ticket games.GameResult,
+        c chan matchCompare) {
+    draw := games.GameResult{}
     for i:=0; i<count; i++ {
-        draw = mega.QuickPick()
+        draw = games.QuickPick(game)
         c <- matchDrawing(ticket, draw)
     }
     close(c)
@@ -102,14 +104,14 @@ func output(total int, results matchResult, elapsed time.Duration) {
     fmt.Fprintln(out, col("0", num, pct))
     num = results.match0M
     pct = (float64(results.match0M) / float64(total)) * 100
-    fmt.Fprintln(out, col("0 + mega", num, pct))
+    fmt.Fprintln(out, col("0 + ball", num, pct))
 
     num = results.match1
     pct = (float64(results.match1) / float64(total)) * 100
     fmt.Fprintln(out, col("1", num, pct))
     num = results.match1M
     pct = (float64(results.match1M) / float64(total)) * 100
-    txt = fmt.Sprintf("1 + mega\t%v\t%6.4f\t", num, pct)
+    txt = fmt.Sprintf("1 + ball\t%v\t%6.4f\t", num, pct)
     fmt.Fprintln(out, txt)
 
     num = results.match2
@@ -117,28 +119,28 @@ func output(total int, results matchResult, elapsed time.Duration) {
     fmt.Fprintln(out, col("2", num, pct))
     num = results.match2M
     pct = (float64(results.match2M) / float64(total)) * 100
-    fmt.Fprintln(out, col("2 + mega", num, pct))
+    fmt.Fprintln(out, col("2 + ball", num, pct))
 
     num = results.match3
     pct = (float64(results.match3) / float64(total)) * 100
     fmt.Fprintln(out, col("3", num, pct))
     num = results.match3M
     pct = (float64(results.match3M) / float64(total)) * 100
-    fmt.Fprintln(out, col("3 + mega", num, pct))
+    fmt.Fprintln(out, col("3 + ball", num, pct))
 
     num = results.match4
     pct = (float64(results.match4) / float64(total)) * 100
     fmt.Fprintln(out, col("4", num, pct))
     num = results.match4M
     pct = (float64(results.match4M) / float64(total)) * 100
-    fmt.Fprintln(out, col("4 + mega", num, pct))
+    fmt.Fprintln(out, col("4 + ball", num, pct))
 
     num = results.match5
     pct = (float64(results.match5) / float64(total)) * 100
     fmt.Fprintln(out, col("5", num, pct))
     num = results.match5M
     pct = (float64(results.match5M) / float64(total)) * 100
-    fmt.Fprintln(out, col("5 + mega", num, pct))
+    fmt.Fprintln(out, col("5 + ball", num, pct))
 
     out.Flush()
 }
@@ -146,12 +148,18 @@ func output(total int, results matchResult, elapsed time.Duration) {
 func main() {
     // Set the default
     drawings := 1000
+
+    gamePtr := flag.String("game", "mega", "the game to simulate")
+    flag.Parse()
+    game := *gamePtr
+
     // Check for command-line override
-    args := os.Args[1:]
+    args := flag.Args()
     if len(args) > 0 {
         sdrawings := args[0]
         drawings, _ = strconv.Atoi(sdrawings)
     }
+
     // Create the struct for the results
     myResults := matchResult{}
     c := make(chan matchCompare, 10)
@@ -162,8 +170,8 @@ func main() {
     // OK, let's go!
     start := time.Now()
 
-    myTicket := mega.QuickPick()
-    go runDrawings(drawings, myTicket, c)
+    myTicket := games.QuickPick(game)
+    go runDrawings(game, drawings, myTicket, c)
 
     for res := range c {
         addToResults(res, &myResults)
