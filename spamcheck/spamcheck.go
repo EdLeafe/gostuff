@@ -1,11 +1,14 @@
 package main
 
 import (
+    "flag"
 	"fmt"
 	"io"
 	"io/ioutil"
+    "log"
 	"os"
 	"regexp"
+    "runtime/pprof"
 	"time"
 )
 
@@ -78,8 +81,8 @@ func copyFileContents(src, dst string) (err error) {
 
 func moveToChecked(prefix string) string {
 	dname := time.Now().Format("20060102_150405")
-	src := fmt.Sprintf("/home/ed/spam/%sspammail", prefix)
-	dst := fmt.Sprintf("/home/ed/spam/checked/%s%s", prefix, dname)
+	src := fmt.Sprintf("/home/ed/test/%sspammail", prefix)
+	dst := fmt.Sprintf("/home/ed/test/checked/%s%s", prefix, dname)
 
 	// copy to the checked directory
 	CopyFile(src, dst)
@@ -92,7 +95,17 @@ func moveToChecked(prefix string) string {
 }
 
 func main() {
-	args := os.Args[1:]
+    var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+    flag.Parse()
+    if *cpuprofile != "" {
+        f, err := os.Create(*cpuprofile)
+        if err != nil {
+            log.Fatal(err)
+        }
+        pprof.StartCPUProfile(f)
+        defer pprof.StopCPUProfile()
+    }
+	args := flag.Args()
 	prefix := ""
 	if len(args) > 0 {
 		prefix = args[0]

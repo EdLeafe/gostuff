@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
     "net/smtp"
@@ -13,8 +14,8 @@ import (
 var (
     acctname   = "ed"
 	from       = "ed@leafe.com"
-	hostname   = "mail.leafe.com"
-	hostport   = "mail.leafe.com:2525"
+	hostname   = "localhost"
+	hostport   = "localhost:2525"
 	msg        = []byte("dummy message")
 	pw         = os.Getenv("MAILPW")
 //	recipients = []string{"ed@leafe.com", "edleafe@gmail.com"}
@@ -33,7 +34,10 @@ func makeHeader(results SpamResults, loc string) string {
 
     // The first format field will eventually be varible, but for now, just
     // leave it blank.
-    msgHeader := fmt.Sprintf(`%sSpam Header Check
+    msgHeader := fmt.Sprintf(`To: Ed Leafe <ed@leafe.com>
+Subject: Spam Check - Go
+
+%sSpam Header Check
 Time: %s
 Spam File: %s`, "", tmStr, loc)
     return msgHeader
@@ -82,17 +86,22 @@ Senders:
 func MailOut(results SpamResults, loc string) {
     content := assemble(results, loc)
 
-	// Set up authentication information.
-	auth := smtp.PlainAuth("", acctname, pw, hostname)
-
-	// Connect to the server, authenticate, set the sender and recipient,
-	// and send the email all in one step.
-	msg := []byte("To: edleafe@gmail.com\r\n" +
-		"From: ed@leafe.com\r\n" +
-		"Subject: SpamTest results\r\n" +
-		"\r\n" + content + "\r\n")
-	err := smtp.SendMail(hostport, auth, from, recipients, msg)
-	if err != nil {
-		log.Fatal(err)
-	}
+    c, err := smtp.Dial("localhost:25")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer c.Close()
+    // Set the sender and recipient.
+    c.Mail("spamCheck@leafe.com")
+    c.Rcpt("ed@leafe.com")
+    // Send the email body.
+    wc, err := c.Data()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer wc.Close()
+    buf := bytes.NewBufferString(content)
+    if _, err = buf.WriteTo(wc); err != nil {
+        log.Fatal(err)
+    }
 }
