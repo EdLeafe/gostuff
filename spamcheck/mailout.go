@@ -28,18 +28,20 @@ func makeLinkText(cnt int, loc string) string {
 To Delete: <%s>`, cnt, link)
 }
 
-func makeHeader(results SpamResults, loc string) string {
+func makeHeader(results SpamResults, loc, prefix string) string {
     tm := time.Now()
     tmStr := tm.Format("3:04 PM on Jan 2, 2006")
-
-    // The first format field will eventually be varible, but for now, just
-    // leave it blank.
-    msgHeader := fmt.Sprintf(`To: Ed Leafe <ed@leafe.com>
-Subject: Spam Check - Go
+    prf := ""
+    if prefix != "" {
+        prf = fmt.Sprintf("%s ", strings.Title(prefix))
+    }
+    template := `To: Ed Leafe <ed@leafe.com>
+Subject: %sSpam Check - Go
 
 %sSpam Header Check
 Time: %s
-Spam File: %s`, "", tmStr, loc)
+Spam File: %s`
+    msgHeader := fmt.Sprintf(template, prf, prf, tmStr, loc)
     return msgHeader
 }
 
@@ -47,9 +49,9 @@ func joinSlice(slc []string) string {
     return strings.Join(slc, "\n")
 }
 
-func assemble(results SpamResults, loc string) string {
+func assemble(results SpamResults, loc, prefix string) string {
     linkText := makeLinkText(results.Count, loc)
-    header := makeHeader(results, loc)
+    header := makeHeader(results, loc, prefix)
 
     text := `%s
 
@@ -83,8 +85,8 @@ Senders:
             linkText)
 }
 
-func MailOut(results SpamResults, loc string) {
-    content := assemble(results, loc)
+func MailOut(results SpamResults, loc, prefix string) {
+    content := assemble(results, loc, prefix)
 
     c, err := smtp.Dial("localhost:25")
     if err != nil {

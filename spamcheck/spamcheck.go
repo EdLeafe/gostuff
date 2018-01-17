@@ -13,7 +13,7 @@ import (
 )
 
 // Flip this when we're ready
-const PRODUCTION = false
+const PRODUCTION = true
 
 func dummy(s string) *regexp.Regexp {
 	ret, _ := regexp.Compile(s)
@@ -81,8 +81,8 @@ func copyFileContents(src, dst string) (err error) {
 
 func moveToChecked(prefix string) string {
 	dname := time.Now().Format("20060102_150405")
-	src := fmt.Sprintf("/home/ed/test/%sspammail", prefix)
-	dst := fmt.Sprintf("/home/ed/test/checked/%s%s", prefix, dname)
+	src := fmt.Sprintf("/home/ed/spam/%sspammail", prefix)
+	dst := fmt.Sprintf("/home/ed/spam/checked/%s%s", prefix, dname)
 
 	// copy to the checked directory
 	CopyFile(src, dst)
@@ -105,12 +105,10 @@ func main() {
         pprof.StartCPUProfile(f)
         defer pprof.StopCPUProfile()
     }
-	args := flag.Args()
-	prefix := ""
-	if len(args) > 0 {
-		prefix = args[0]
-	}
-	loc := moveToChecked(prefix)
-    analyzed := Analyze(loc)
-    MailOut(analyzed, loc)
+    spams := []string{"", "list"}
+	for _, prefix := range spams {
+        loc := moveToChecked(prefix)
+        analyzed := Analyze(loc)
+        MailOut(analyzed, loc, prefix)
+    }
 }

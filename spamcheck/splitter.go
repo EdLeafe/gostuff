@@ -88,7 +88,10 @@ func processMsg(wg *sync.WaitGroup, txt string, chans ParseChannels) {
 	stxt := strings.TrimSpace(txt)
 	r := strings.NewReader(stxt)
 	msg, err := mail.ReadMessage(r)
-	check(err)
+    if err != nil {
+        // Malformed email; skip it
+        return
+    }
 	h := msg.Header
 
 	ss := updateSubject(h)
