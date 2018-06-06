@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"mime"
 	"net/mail"
 	"os"
 	"regexp"
@@ -17,10 +18,12 @@ const EDPAT = "\\bED\\b"
 const SENDPAT = "([^<]+)<\\S+>"
 
 var (
-	msgSplitter = regexp.MustCompile(MSGSPLIT)
+	dec         = new(mime.WordDecoder)
 	edexp       = regexp.MustCompile(EDPAT)
+	msgSplitter = regexp.MustCompile(MSGSPLIT)
 	sendexp     = regexp.MustCompile(SENDPAT)
-    msgCount    = 0
+	msgCount    = 0
+	recCount    = 0
 )
 
 type StringCount struct {
@@ -54,7 +57,12 @@ func check(e error) {
 }
 
 func updateSubject(h mail.Header) []string {
-	sub := h.Get("Subject")
+	enc_sub := h.Get("Subject")
+	sub, err := dec.DecodeHeader(enc_sub)
+	if err != nil {
+		// Unsupported encoding; leave it as-is
+		sub = enc_sub
+	}
 	ret := []string{sub, ""}
 	if edexp.MatchString(sub) {
 		ret[1] = sub
@@ -75,10 +83,12 @@ func updateFrom(h mail.Header) string {
 
 func updateRecip(h mail.Header) string {
 	orig := h.Get("X-Original-To")
-    ret := ""
+	//	orig := h.Get("To")
+	ret := ""
 	if len(orig) > 0 {
 		//rmap[orig] += 1
 		ret = orig
+		recCount += 1
 	}
 	return ret
 }
@@ -88,89 +98,88 @@ func processMsg(wg *sync.WaitGroup, txt string, chans ParseChannels) {
 	stxt := strings.TrimSpace(txt)
 	r := strings.NewReader(stxt)
 	msg, err := mail.ReadMessage(r)
-    if err != nil {
-        // Malformed email; skip it
-        return
-    }
+	if err != nil {
+		// Malformed email; skip it
+		return
+	}
 	h := msg.Header
-
 	ss := updateSubject(h)
 	chans.Subjs <- ss[0]
-    if ss[1] != "" {
-        chans.Eds <- ss[1]
-    }
+	if ss[1] != "" {
+		chans.Eds <- ss[1]
+	}
 	f := updateFrom(h)
 	chans.Senders <- f
 	rr := updateRecip(h)
-    chans.Recips <- rr
+	chans.Recips <- rr
 }
 
 func sortStringCount(txts map[string]int, ones bool) []string {
-    bsc := byStringCount{}
-    for k, v := range txts {
-        sc := StringCount{k, v}
-        bsc = append(bsc, sc)
-    }
-    sort.Sort(bsc)
+	bsc := byStringCount{}
+	for k, v := range txts {
+		sc := StringCount{k, v}
+		bsc = append(bsc, sc)
+	}
+	sort.Sort(bsc)
 
-    numtxt := []string{}
-    for _, scOrd := range bsc {
-        txt := scOrd.Text
-        if ones || scOrd.Count > 1 {
-                txt = fmt.Sprintf("[%d] %s", scOrd.Count, scOrd.Text)
-            }
-            numtxt = append(numtxt, txt)
-        }
-    return numtxt
+	numtxt := []string{}
+	for _, scOrd := range bsc {
+		txt := scOrd.Text
+		if ones || scOrd.Count > 1 {
+			txt = fmt.Sprintf("[%d] %s", scOrd.Count, scOrd.Text)
+		}
+		numtxt = append(numtxt, txt)
+	}
+	return numtxt
 }
 
 type ParseChannels struct {
-    Subjs chan string
-    Eds chan string
-    Senders chan string
-    Recips chan string
+	Subjs   chan string
+	Eds     chan string
+	Senders chan string
+	Recips  chan string
 }
 
 func (ch ParseChannels) Close() {
-    close(ch.Subjs)
-    close(ch.Eds)
-    close(ch.Senders)
-    close(ch.Recips)
+	close(ch.Subjs)
+	close(ch.Eds)
+	close(ch.Senders)
+	close(ch.Recips)
 }
 
 type SpamResults struct {
 	SortedSubjects []string
-	SortedEds []string
-	SortedSenders []string
-	SortedRecips []string
-    Count int
+	SortedEds      []string
+	SortedSenders  []string
+	SortedRecips   []string
+	Count          int
 }
 
 func extractMessages(wg *sync.WaitGroup, b *bytes.Buffer,
-        chans ParseChannels) {
-    for {
+	chans ParseChannels) {
+	for {
 		// See if the buffer contains the separator
 		found := msgSplitter.FindIndex(b.Bytes()[1:])
 		if found == nil {
-            return
-        }
-        start := found[0]
-        if start != 0 {
-            alltext := b.String()
-            b.Reset()
-            // Account for the offset in the FindIndex call
-            pos := start + 1
-            txt := alltext[:pos]
-            b.WriteString(alltext[pos:])
-            wg.Add(1)
-            msgCount += 1
-            go processMsg(wg, txt, chans)
-        }
-    }
+			return
+		}
+		start := found[0]
+		if start != 0 {
+			alltext := b.String()
+			b.Reset()
+			// Account for the offset in the FindIndex call
+			pos := start + 1
+			txt := alltext[:pos]
+			b.WriteString(alltext[pos:])
+			wg.Add(1)
+			msgCount += 1
+			go processMsg(wg, txt, chans)
+		}
+	}
 }
 
 func Analyze(pth string) SpamResults {
-    chans := ParseChannels{}
+	chans := ParseChannels{}
 	var wg sync.WaitGroup
 	var buf bytes.Buffer
 	chans.Subjs = make(chan string, 10000)
@@ -188,20 +197,20 @@ func Analyze(pth string) SpamResults {
 		}
 		// Write it to the buffer
 		buf.WriteString(string(b))
-        extractMessages(&wg, &buf, chans)
+		extractMessages(&wg, &buf, chans)
 	}
 	// We've gotten to the end, so the buffer will contain the last message.
 	// Process that one, and we're done.
 	wg.Add(1)
-    msgCount += 1
+	msgCount += 1
 	go processMsg(&wg, buf.String(), chans)
 	wg.Wait()
-    chans.Close()
+	chans.Close()
 	// Create the maps for the various reports
-    subjs := make(map[string]int)
-    eds := make(map[string]int)
-    senders := make(map[string]int)
-    recips := make(map[string]int)
+	subjs := make(map[string]int)
+	eds := make(map[string]int)
+	senders := make(map[string]int)
+	recips := make(map[string]int)
 	for ss := range chans.Subjs {
 		subjs[ss] += 1
 	}
@@ -219,7 +228,8 @@ func Analyze(pth string) SpamResults {
 	sortedEds := sortStringCount(eds, false)
 	sortedSenders := sortStringCount(senders, false)
 	sortedRecips := sortStringCount(recips, true)
-    result := SpamResults{sortedSubjs, sortedEds, sortedSenders, sortedRecips,
-        msgCount}
-    return result
+
+	result := SpamResults{sortedSubjs, sortedEds, sortedSenders, sortedRecips,
+		msgCount}
+	return result
 }

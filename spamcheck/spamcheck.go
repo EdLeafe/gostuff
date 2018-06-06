@@ -1,14 +1,14 @@
 package main
 
 import (
-    "flag"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
-    "log"
+	"log"
 	"os"
 	"regexp"
-    "runtime/pprof"
+	"runtime/pprof"
 	"time"
 )
 
@@ -80,35 +80,35 @@ func copyFileContents(src, dst string) (err error) {
 }
 
 func moveToChecked(prefix string) string {
-	dname := time.Now().Format("20060102_150405")
+	dname := time.Now().Format("2006Jan02_150405")
 	src := fmt.Sprintf("/home/ed/spam/%sspammail", prefix)
 	dst := fmt.Sprintf("/home/ed/spam/checked/%s%s", prefix, dname)
 
 	// copy to the checked directory
 	CopyFile(src, dst)
-    if PRODUCTION {
-        // empty the source file
-        empty := []byte{}
-        ioutil.WriteFile(src, empty, 0660)
-    }
-    return dst
+	if PRODUCTION {
+		// empty the source file
+		empty := []byte{}
+		ioutil.WriteFile(src, empty, 0660)
+	}
+	return dst
 }
 
 func main() {
-    var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
-    flag.Parse()
-    if *cpuprofile != "" {
-        f, err := os.Create(*cpuprofile)
-        if err != nil {
-            log.Fatal(err)
-        }
-        pprof.StartCPUProfile(f)
-        defer pprof.StopCPUProfile()
-    }
-    spams := []string{"", "list"}
+	var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+	spams := []string{"", "list"}
 	for _, prefix := range spams {
-        loc := moveToChecked(prefix)
-        analyzed := Analyze(loc)
-        MailOut(analyzed, loc, prefix)
-    }
+		loc := moveToChecked(prefix)
+		analyzed := Analyze(loc)
+		MailOut(analyzed, loc, prefix)
+	}
 }
