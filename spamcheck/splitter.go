@@ -179,6 +179,8 @@ func extractMessages(wg *sync.WaitGroup, b *bytes.Buffer,
 }
 
 func Analyze(pth string) SpamResults {
+    // Already initialized at top; make sure it's zeroed out
+    msgCount = 0
 	chans := ParseChannels{}
 	var wg sync.WaitGroup
 	var buf bytes.Buffer
