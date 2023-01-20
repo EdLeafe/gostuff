@@ -23,7 +23,7 @@ var (
 )
 
 func makeLinkText(cnt int, loc string) string {
-	link := "http://mail.leafe.com/cgi-bin/delspam/" + filepath.Base(loc)
+	link := "https://mailmaint.leafe.com/spam/" + filepath.Base(loc)
 	return fmt.Sprintf(`Filtered Message Total: %d
 To Delete: <%s>`, cnt, link)
 }
