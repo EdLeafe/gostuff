@@ -72,5 +72,5 @@ func main() {
 	if err != nil {
 		fmt.Println("ERROR", err)
 	}
-    fmt.Printf(cbresp.Data.Amount)
+	fmt.Printf(cbresp.Data.Amount)
 }

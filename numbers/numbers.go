@@ -12,11 +12,11 @@ func SeedRandom() {
 
 func RandRange(low, high int) int {
 	if low > high {
-        low, high = high, low
-    } else if low == high {
-        return low
-    }
-    diff := high - low
+		low, high = high, low
+	} else if low == high {
+		return low
+	}
+	diff := high - low
 	return rand.Intn(int(diff+1)) + low
 }
 
@@ -39,32 +39,32 @@ func RandSet(low, high, count int) []int {
 }
 
 func Distribution(low, high, total int) []int {
-    SeedRandom()
-    count := make([]int, total)
+	SeedRandom()
+	count := make([]int, total)
 
-    for i:=0; i < total; i++ {
-        rr := RandRange(low, high)
-        count[rr-1] += 1
-    }
-    return count
+	for i := 0; i < total; i++ {
+		rr := RandRange(low, high)
+		count[rr-1] += 1
+	}
+	return count
 }
 
 func MinInt(sl []int) int {
-    m := sl[0]
-    for _, v := range sl[1:] {
-        if v < m {
-            m = v
-        }
-    }
-    return m
+	m := sl[0]
+	for _, v := range sl[1:] {
+		if v < m {
+			m = v
+		}
+	}
+	return m
 }
 
 func MaxInt(sl []int) int {
-    m := sl[0]
-    for _, v := range sl[1:] {
-        if v > m {
-            m = v
-        }
-    }
-    return m
+	m := sl[0]
+	for _, v := range sl[1:] {
+		if v > m {
+			m = v
+		}
+	}
+	return m
 }
